@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
   "name": "UNETI - Lịch TH theo học phần",
-  "version": "1.4.0",
-  "description": "Tự đọc các môn Thực hành trên UNETI, nhập tiết/phòng/giảng viên, chèn lịch cá nhân trực tiếp vào lịch tuần và tự khôi phục khi đổi tuần.",
+  "version": "1.5.0",
+  "description": "Tự đọc môn Thực hành trên UNETI, chọn thứ/tiết, xác nhận một lần và chèn lịch cá nhân tự khôi phục khi đổi tuần.",
   "permissions": [
     "storage"
   ],
@@ -17,8 +17,7 @@
         "https://apisv.uneti.edu.vn/*"
       ],
       "js": [
-        "content.js",
-        "week-watcher.js"
+        "content.js"
       ],
       "css": [
         "styles.css"

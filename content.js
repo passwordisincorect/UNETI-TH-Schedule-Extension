@@ -60,6 +60,69 @@
     return { day, start, end, session, sessionStart, sessionEnd };
   }
 
+  function buildPlacement(day, start, end) {
+    day = Number(day);
+    start = Number(start);
+    end = Number(end);
+    if (!Number.isInteger(day) || day < 2 || day > 8) return null;
+    if (!Number.isInteger(start) || !Number.isInteger(end) || start < 1 || end > 15 || start > end) return null;
+
+    let session = null;
+    let sessionStart = null;
+    let sessionEnd = null;
+    if (start >= 1 && end <= 6) {
+      session = 'morning'; sessionStart = 1; sessionEnd = 6;
+    } else if (start >= 7 && end <= 12) {
+      session = 'afternoon'; sessionStart = 7; sessionEnd = 12;
+    } else if (start >= 13 && end <= 15) {
+      session = 'evening'; sessionStart = 13; sessionEnd = 15;
+    } else {
+      return null;
+    }
+    return { day, start, end, session, sessionStart, sessionEnd };
+  }
+
+  function getCoursePlacement(course) {
+    const legacy = parseScheduleInput(course?.time || '');
+    const hasDay = course?.day !== '' && course?.day !== null && course?.day !== undefined;
+    const hasStart = course?.startPeriod !== '' && course?.startPeriod !== null && course?.startPeriod !== undefined;
+    const hasEnd = course?.endPeriod !== '' && course?.endPeriod !== null && course?.endPeriod !== undefined;
+
+    if (!hasDay && !hasStart && !hasEnd) return legacy;
+
+    // v1.5 selections override only the fields the user changed; remaining values can
+    // come from legacy v1.4 text until the first confirmation persists all 3 fields.
+    return buildPlacement(
+      hasDay ? course.day : legacy?.day,
+      hasStart ? course.startPeriod : legacy?.start,
+      hasEnd ? course.endPeriod : legacy?.end
+    );
+  }
+
+  function dayLabel(day) {
+    const n = Number(day);
+    return n === 8 ? 'Chủ nhật' : (n >= 2 && n <= 7 ? `Thứ ${n}` : '');
+  }
+
+  function dayOptions(selected) {
+    const current = Number(selected) || 0;
+    const options = ['<option value="">Chọn thứ</option>'];
+    for (let day = 2; day <= 7; day++) {
+      options.push(`<option value="${day}"${current === day ? ' selected' : ''}>Thứ ${day}</option>`);
+    }
+    options.push(`<option value="8"${current === 8 ? ' selected' : ''}>Chủ nhật</option>`);
+    return options.join('');
+  }
+
+  function periodOptions(selected, placeholder) {
+    const current = Number(selected) || 0;
+    const options = [`<option value="">${escapeHtml(placeholder)}</option>`];
+    for (let period = 1; period <= 15; period++) {
+      options.push(`<option value="${period}"${current === period ? ' selected' : ''}>${period}</option>`);
+    }
+    return options.join('');
+  }
+
   function buildCalendarCardHtml(course, placement) {
     const classLine = [cleanText(course.classCode || ''), cleanText(course.code || '')].filter(Boolean).join(' - ');
     const room = cleanText(course.room || '');
@@ -128,11 +191,11 @@
     const schedule = findWeeklyScheduleTable();
     if (!schedule) return 0;
 
-    const courses = (await loadCourses()).filter(isPracticeCourse);
+    const courses = (await loadCourses()).filter(course => isPracticeCourse(course) && course.confirmed === true);
     let rendered = 0;
 
     for (const course of courses) {
-      const placement = parseScheduleInput(course.time || '');
+      const placement = getCoursePlacement(course);
       if (!placement) continue;
       const cell = getSessionTargetCell(schedule, placement);
       if (!cell) continue;
@@ -150,9 +213,8 @@
 
       const span = placement.sessionEnd - placement.sessionStart + 1;
       const top = ((placement.start - placement.sessionStart) / span) * 100;
-      const height = ((placement.end - placement.start + 1) / span) * 100;
       card.style.top = `${top}%`;
-      card.style.height = `${height}%`;
+      card.style.height = 'auto';
       cell.appendChild(card);
       rendered++;
     }
@@ -409,8 +471,12 @@
           code: existing.code || item.code || '',
           classCode: existing.classCode || item.classCode || '',
           time: existing.time || item.time || '',
+          day: existing.day || item.day || '',
+          startPeriod: existing.startPeriod || item.startPeriod || '',
+          endPeriod: existing.endPeriod || item.endPeriod || '',
           room: existing.room || item.room || '',
-          lecturer: existing.lecturer || item.lecturer || ''
+          lecturer: existing.lecturer || item.lecturer || '',
+          confirmed: existing.confirmed === true || item.confirmed === true
         });
       }
     }
@@ -434,8 +500,12 @@
           code: incoming.code || '',
           classCode: incoming.classCode || '',
           time: '',
+          day: '',
+          startPeriod: '',
+          endPeriod: '',
           room: '',
           lecturer: '',
+          confirmed: false,
           detectedAt: new Date().toISOString()
         });
         added++;
@@ -460,7 +530,7 @@
         <header class="uneti-th-header">
           <div>
             <div class="uneti-th-title">Lịch thực hành</div>
-            <div class="uneti-th-subtitle">Tự lấy môn “Thực hành” · Nhập tiết, phòng và giảng viên · Tự hiện trên lịch tuần</div>
+            <div class="uneti-th-subtitle">Tự lấy môn “Thực hành” · Chọn thứ/tiết · Xác nhận một lần để hiện trên lịch tuần</div>
           </div>
           <button id="uneti-th-close" class="uneti-th-icon-btn" type="button" title="Đóng">×</button>
         </header>
@@ -477,9 +547,12 @@
             <thead>
               <tr>
                 <th>Môn thực hành</th>
-                <th>Thời gian / Tiết</th>
+                <th>Thứ</th>
+                <th>Từ tiết</th>
+                <th>Đến tiết</th>
                 <th>Phòng</th>
                 <th>Giảng viên</th>
+                <th>Trạng thái</th>
               </tr>
             </thead>
             <tbody id="uneti-th-body"></tbody>
@@ -523,8 +596,12 @@
           code: existing.code || item.code || '',
           classCode: existing.classCode || item.classCode || '',
           time: existing.time || item.time || '',
+          day: existing.day || item.day || '',
+          startPeriod: existing.startPeriod || item.startPeriod || '',
+          endPeriod: existing.endPeriod || item.endPeriod || '',
           room: existing.room || item.room || '',
-          lecturer: existing.lecturer || item.lecturer || ''
+          lecturer: existing.lecturer || item.lecturer || '',
+          confirmed: existing.confirmed === true || item.confirmed === true
         });
       }
     }
@@ -536,61 +613,99 @@
 
     for (const item of items) {
       const tr = document.createElement('tr');
+      const migrated = getCoursePlacement(item);
+      const selectedDay = item.day || migrated?.day || '';
+      const selectedStart = item.startPeriod || migrated?.start || '';
+      const selectedEnd = item.endPeriod || migrated?.end || '';
       tr.innerHTML = `
         <td class="uneti-th-course"><strong>${escapeHtml(item.name)}</strong></td>
         <td>
-          <input
-            class="uneti-th-inline-input uneti-th-time-input"
-            data-id="${escapeHtml(item.id)}"
-            data-field="time"
-            type="text"
-            maxlength="100"
-            value="${escapeHtml(item.time || '')}"
-            placeholder="VD: Thứ 3, tiết 1–3"
-            aria-label="Thời gian hoặc tiết học của ${escapeHtml(item.name)}"
-          >
+          <select class="uneti-th-field uneti-th-select uneti-th-day-select" data-id="${escapeHtml(item.id)}" data-field="day" aria-label="Thứ học của ${escapeHtml(item.name)}">
+            ${dayOptions(selectedDay)}
+          </select>
         </td>
         <td>
-          <input
-            class="uneti-th-inline-input uneti-th-room-input"
-            data-id="${escapeHtml(item.id)}"
-            data-field="room"
-            type="text"
-            maxlength="80"
-            value="${escapeHtml(item.room || '')}"
-            placeholder="VD: HA10.205"
-            aria-label="Phòng học của ${escapeHtml(item.name)}"
-          >
+          <select class="uneti-th-field uneti-th-select uneti-th-start-select" data-id="${escapeHtml(item.id)}" data-field="startPeriod" aria-label="Tiết bắt đầu của ${escapeHtml(item.name)}">
+            ${periodOptions(selectedStart, 'Từ tiết')}
+          </select>
         </td>
         <td>
-          <input
-            class="uneti-th-inline-input uneti-th-lecturer-input"
-            data-id="${escapeHtml(item.id)}"
-            data-field="lecturer"
-            type="text"
-            maxlength="100"
-            value="${escapeHtml(item.lecturer || '')}"
-            placeholder="VD: Nguyễn Văn A"
-            aria-label="Giảng viên của ${escapeHtml(item.name)}"
-          >
+          <select class="uneti-th-field uneti-th-select uneti-th-end-select" data-id="${escapeHtml(item.id)}" data-field="endPeriod" aria-label="Tiết kết thúc của ${escapeHtml(item.name)}">
+            ${periodOptions(selectedEnd, 'Đến tiết')}
+          </select>
+        </td>
+        <td>
+          <input class="uneti-th-field uneti-th-inline-input uneti-th-room-input" data-id="${escapeHtml(item.id)}" data-field="room" type="text" maxlength="80" value="${escapeHtml(item.room || '')}" placeholder="VD: HA10-809" aria-label="Phòng học của ${escapeHtml(item.name)}">
+        </td>
+        <td>
+          <input class="uneti-th-field uneti-th-inline-input uneti-th-lecturer-input" data-id="${escapeHtml(item.id)}" data-field="lecturer" type="text" maxlength="100" value="${escapeHtml(item.lecturer || '')}" placeholder="VD: Nguyễn Văn A" aria-label="Giảng viên của ${escapeHtml(item.name)}">
+        </td>
+        <td class="uneti-th-confirm-cell">
+          <button class="${item.confirmed ? 'uneti-th-confirmed' : 'uneti-th-confirm'}" data-id="${escapeHtml(item.id)}" type="button"${item.confirmed ? ' disabled' : ''}>
+            ${item.confirmed ? '✓ Đã xác nhận' : 'Xác nhận'}
+          </button>
         </td>
       `;
       body.appendChild(tr);
     }
   }
 
-  async function saveInlineField(id, field, value) {
-    if (!id || !['time', 'room', 'lecturer'].includes(field)) return;
+  async function saveCourseField(id, field, value) {
+    if (!id || !['day', 'startPeriod', 'endPeriod', 'room', 'lecturer'].includes(field)) return false;
     const items = await loadCourses();
     const index = items.findIndex(x => x.id === id);
-    if (index < 0) return;
+    if (index < 0) return false;
+
+    let nextValue = value;
+    if (['day', 'startPeriod', 'endPeriod'].includes(field)) {
+      nextValue = value === '' ? '' : Number(value);
+    } else {
+      nextValue = cleanText(value);
+    }
+
     items[index] = {
       ...items[index],
-      [field]: cleanText(value),
+      [field]: nextValue,
       updatedAt: new Date().toISOString()
     };
     await saveCourses(items);
+    if (items[index].confirmed === true) await renderCalendarCourses();
+    return true;
+  }
+
+  // Compatibility for older tests/internal callers that still save room/lecturer this way.
+  async function saveInlineField(id, field, value) {
+    if (!['room', 'lecturer'].includes(field)) return false;
+    return saveCourseField(id, field, value);
+  }
+
+  async function confirmCourse(id) {
+    const items = await loadCourses();
+    const index = items.findIndex(x => x.id === id);
+    if (index < 0) return false;
+
+    const course = items[index];
+    const placement = getCoursePlacement(course);
+    if (!placement) {
+      setStatus('Hãy chọn Thứ, Từ tiết và Đến tiết hợp lệ trong cùng một ca (1–6, 7–12 hoặc 13–15).', 'warn');
+      return false;
+    }
+
+    // Persist migrated values from v1.4 when present.
+    items[index] = {
+      ...course,
+      day: placement.day,
+      startPeriod: placement.start,
+      endPeriod: placement.end,
+      confirmed: true,
+      confirmedAt: course.confirmedAt || new Date().toISOString(),
+      updatedAt: new Date().toISOString()
+    };
+    await saveCourses(items);
+    await render();
     await renderCalendarCourses();
+    setStatus(`Đã xác nhận ${course.name}. Từ giờ môn này tự hiện lại khi mở/đổi tuần.`, 'ok');
+    return true;
   }
 
   async function runScan({ silent = false } = {}) {
@@ -603,7 +718,7 @@
     const result = await mergeScannedCourses(scanned);
     await render();
     await renderCalendarCourses();
-    setStatus(`Đã tìm thấy ${scanned.length} môn thực hành. Bạn có thể nhập tiết, phòng và giảng viên trực tiếp bên dưới.`, 'ok');
+    setStatus(`Đã tìm thấy ${scanned.length} môn thực hành. Hãy chọn thứ/tiết, nhập phòng/giảng viên rồi bấm Xác nhận một lần.`, 'ok');
   }
 
   async function openPanel() {
@@ -631,9 +746,15 @@
     document.getElementById('uneti-th-clear').addEventListener('click', clearAll);
 
     document.getElementById('uneti-th-body').addEventListener('change', e => {
-      const input = e.target.closest('.uneti-th-inline-input');
-      if (!input) return;
-      saveInlineField(input.dataset.id, input.dataset.field, input.value);
+      const field = e.target.closest('.uneti-th-field');
+      if (!field) return;
+      saveCourseField(field.dataset.id, field.dataset.field, field.value);
+    });
+
+    document.getElementById('uneti-th-body').addEventListener('click', e => {
+      const button = e.target.closest('.uneti-th-confirm');
+      if (!button) return;
+      confirmCourse(button.dataset.id);
     });
 
     document.addEventListener('keydown', e => {
@@ -643,7 +764,7 @@
     chrome.storage.onChanged.addListener((changes, areaName) => {
       if (areaName !== 'local' || !changes[STORAGE_KEY]) return;
       const active = document.activeElement;
-      if (!active?.classList?.contains('uneti-th-inline-input')) render();
+      if (!active?.classList?.contains('uneti-th-field')) render();
       renderCalendarCourses();
     });
   }
@@ -652,7 +773,59 @@
     if (document.body && !document.getElementById(ROOT_ID)) createRoot();
   }
 
+  let calendarRefreshTimer = null;
+
+  function isExtensionOwnedNode(node) {
+    if (!node || node.nodeType !== 1) return false;
+    if (node.id === ROOT_ID) return true;
+    if (node.classList?.contains('uneti-th-calendar-card')) return true;
+    if (typeof node.closest === 'function' && node.closest(`#${ROOT_ID}`)) return true;
+    return false;
+  }
+
+  function mutationNeedsCalendarRefresh(mutations = []) {
+    for (const mutation of mutations) {
+      if (isExtensionOwnedNode(mutation?.target)) continue;
+
+      if (mutation?.type === 'characterData') return true;
+      if (mutation?.type !== 'childList') continue;
+
+      const changedNodes = [
+        ...(mutation.addedNodes ? Array.from(mutation.addedNodes) : []),
+        ...(mutation.removedNodes ? Array.from(mutation.removedNodes) : [])
+      ];
+      if (!changedNodes.length) continue;
+      if (changedNodes.some(node => !isExtensionOwnedNode(node))) return true;
+    }
+    return false;
+  }
+
+  function scheduleCalendarRefresh(delay = 250) {
+    if (calendarRefreshTimer) clearTimeout(calendarRefreshTimer);
+    calendarRefreshTimer = setTimeout(async () => {
+      calendarRefreshTimer = null;
+      await renderCalendarCourses();
+    }, delay);
+  }
+
+  function startCalendarWatcher() {
+    if (typeof MutationObserver !== 'function' || !document.body) return null;
+
+    const observer = new MutationObserver(mutations => {
+      if (!mutationNeedsCalendarRefresh(mutations)) return;
+      scheduleCalendarRefresh();
+    });
+
+    observer.observe(document.body, {
+      childList: true,
+      subtree: true,
+      characterData: true
+    });
+    return observer;
+  }
+
   ensureRoot();
+  startCalendarWatcher();
 
   let lastUrl = location.href;
   setInterval(async () => {
