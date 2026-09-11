@@ -47,10 +47,13 @@
 .uneti-th-table { width: 100%; border-collapse: collapse; background: white; font-size: 13px; }
 .uneti-th-table th { position: sticky; top: 0; z-index: 1; text-align: left; background: #f2f6fb; color: #344054; font-weight: 700; }
 .uneti-th-table th, .uneti-th-table td { padding: 10px 11px; border-bottom: 1px solid #edf1f5; vertical-align: middle; }
-.uneti-th-course { width: 36%; min-width: 260px; }
-.uneti-th-table th:nth-child(2), .uneti-th-table td:nth-child(2) { width: 26%; min-width: 220px; }
-.uneti-th-table th:nth-child(3), .uneti-th-table td:nth-child(3) { width: 16%; min-width: 150px; }
-.uneti-th-table th:nth-child(4), .uneti-th-table td:nth-child(4) { width: 22%; min-width: 190px; }
+.uneti-th-course { width: 27%; min-width: 240px; }
+.uneti-th-table th:nth-child(2), .uneti-th-table td:nth-child(2) { min-width: 110px; }
+.uneti-th-table th:nth-child(3), .uneti-th-table td:nth-child(3),
+.uneti-th-table th:nth-child(4), .uneti-th-table td:nth-child(4) { min-width: 90px; }
+.uneti-th-table th:nth-child(5), .uneti-th-table td:nth-child(5) { min-width: 140px; }
+.uneti-th-table th:nth-child(6), .uneti-th-table td:nth-child(6) { min-width: 180px; }
+.uneti-th-table th:nth-child(7), .uneti-th-table td:nth-child(7) { min-width: 125px; }
 
 .uneti-th-inline-input {
   width: 100%; min-width: 0; border: 1px solid #cfd8e3; border-radius: 7px;
@@ -58,12 +61,23 @@
 }
 .uneti-th-inline-input:focus { border-color: var(--th-blue); box-shadow: 0 0 0 3px rgba(11,99,206,.12); }
 .uneti-th-inline-input::placeholder { color: #98a2b3; }
+.uneti-th-select {
+  width: 100%; min-width: 0; border: 1px solid #cfd8e3; border-radius: 7px;
+  padding: 8px 7px; background: #fff; color: #101828; font: inherit; outline: none;
+}
+.uneti-th-select:focus { border-color: var(--th-blue); box-shadow: 0 0 0 3px rgba(11,99,206,.12); }
+.uneti-th-confirm, .uneti-th-confirmed {
+  width: 100%; border-radius: 7px; padding: 8px 9px; font: inherit; font-weight: 700;
+}
+.uneti-th-confirm { border: 1px solid #16a34a; background: #16a34a; color: #fff; cursor: pointer; }
+.uneti-th-confirm:hover { background: #15803d; }
+.uneti-th-confirmed { border: 1px solid #86efac; background: #ecfdf3; color: #027a48; cursor: default; }
 .uneti-th-empty { padding: 28px 18px 32px; text-align: center; color: var(--th-muted); }
 
 @media (max-width: 680px) {
   #uneti-th-panel { right: 8px; bottom: 76px; width: calc(100vw - 16px); max-height: calc(100vh - 92px); }
-  #uneti-th-launcher { right: 16px; bottom: 12px; }
-  .uneti-th-table { min-width: 980px; }
+  #uneti-th-launcher { right: 12px; bottom: 12px; }
+  .uneti-th-table { min-width: 1120px; }
 }
 
 /* Học phần thực hành do extension chèn trực tiếp lên lịch tuần. */
@@ -72,16 +86,18 @@
   left: 6px;
   right: 6px;
   z-index: 8;
-  min-height: 42px;
+  min-height: 0;
+  height: auto;
+  max-height: none;
   padding: 6px 7px;
-  border: 1px solid #86c98a;
+  border: 1px solid #4ba51f;
   border-radius: 6px;
-  background: #dcfce7;
+  background: #71CB35;
   color: #073b57;
   font-size: 14px;
   line-height: 1.42;
   text-align: left;
-  overflow: auto;
+  overflow: visible;
   box-shadow: 0 1px 3px rgba(16, 24, 40, .12);
 }
 .uneti-th-calendar-card .uneti-th-calendar-name {
