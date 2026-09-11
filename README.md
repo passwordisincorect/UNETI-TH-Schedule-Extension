@@ -1,4 +1,4 @@
-# UNETI - Lịch TH theo học phần v1.3.0
+# UNETI - Lịch TH theo học phần v1.4.0
 
 Extension Chrome/Edge dành cho cổng sinh viên UNETI.
 
@@ -14,6 +14,7 @@ Extension Chrome/Edge dành cho cổng sinh viên UNETI.
 - Dữ liệu tự lưu trong `chrome.storage.local`.
 - Reload, đóng/mở trình duyệt hoặc đăng xuất/đăng nhập lại UNETI vẫn giữ dữ liệu.
 - Khi mở **Lịch theo tuần**, extension chèn học phần TH trực tiếp vào đúng ngày/ca như một học phần bình thường.
+- Khi bấm **Tiếp / Trở về / Hiện tại** để đổi tuần, extension tự nhận biết DOM lịch đã thay đổi và tự chèn lại các môn TH; không cần mở nút **TH** lần nữa.
 - Học phần do extension thêm có **nền xanh lá nhạt** để phân biệt với dữ liệu chính thức của trường.
 - Nội dung ô lịch gồm: tên học phần, `Lớp HP - Mã lớp HP`, tiết, phòng và giảng viên.
 - Không gửi hoặc sửa dữ liệu trên máy chủ UNETI.
@@ -43,3 +44,9 @@ Các ca được ánh xạ theo lịch UNETI:
 ## Lưu ý
 
 Các ô TH do extension thêm chỉ là lớp giao diện trên trình duyệt của bạn. Chúng không làm thay đổi lịch chính thức trên hệ thống của trường.
+
+## Sửa lỗi v1.4.0
+
+- Khắc phục lỗi lịch TH biến mất sau khi chuyển tuần bằng nút **Tiếp / Trở về / Hiện tại**.
+- Theo dõi thay đổi DOM của lịch UNETI bằng `MutationObserver` và tự render lại dữ liệu TH sau khi giao diện tuần mới tải xong.
+- Bỏ qua các thay đổi DOM do chính extension tạo để tránh vòng lặp render.
