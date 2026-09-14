@@ -212,8 +212,20 @@
       card.innerHTML = buildCalendarCardHtml(course, placement);
 
       const span = placement.sessionEnd - placement.sessionStart + 1;
-      const top = ((placement.start - placement.sessionStart) / span) * 100;
-      card.style.top = `${top}%`;
+      const row = schedule.sessionRows.get(placement.session);
+      const rowRect = typeof row?.getBoundingClientRect === 'function' ? row.getBoundingClientRect() : null;
+      const cellRect = typeof cell?.getBoundingClientRect === 'function' ? cell.getBoundingClientRect() : null;
+
+      if (rowRect && cellRect && Number.isFinite(rowRect.top) && Number.isFinite(rowRect.height)
+          && Number.isFinite(cellRect.top) && rowRect.height > 0) {
+        const sessionOffset = rowRect.top - cellRect.top;
+        const periodOffset = ((placement.start - placement.sessionStart) / span) * rowRect.height;
+        const topPx = Math.max(0, sessionOffset + periodOffset);
+        card.style.top = `${Math.round(topPx * 100) / 100}px`;
+      } else {
+        const top = ((placement.start - placement.sessionStart) / span) * 100;
+        card.style.top = `${top}%`;
+      }
       card.style.height = 'auto';
       cell.appendChild(card);
       rendered++;
@@ -282,6 +294,16 @@
     return -1;
   }
 
+  function isCurrentSemesterRegistrationHeaders(headers = []) {
+    const normalized = headers.map(h => norm(h));
+    const hasClassCode = normalized.some(h => h === 'ma lop hp' || h === 'ma lop hoc phan');
+    const hasCourseName = normalized.some(h => h === 'ten mon hoc/hp' || h === 'ten mon hoc hp' || h === 'ten mon hoc');
+    const hasExpectedClass = normalized.some(h => h === 'lop hoc du kien');
+    const registrationSignals = ['nhom th', 'hoc phi', 'trang thai dk', 'ngay dk', 'tt lop hp'];
+    const signalCount = registrationSignals.filter(signal => normalized.includes(signal)).length;
+    return hasClassCode && hasCourseName && hasExpectedClass && signalCount >= 1;
+  }
+
   function isLikelyCourseName(name) {
     const n = cleanText(name);
     const x = norm(n);
@@ -327,6 +349,7 @@
 
       const headers = [...rows[headerRowIndex].querySelectorAll('th,td')]
         .map(c => cleanText(c.innerText || c.textContent || ''));
+      if (!isCurrentSemesterRegistrationHeaders(headers)) continue;
 
       for (let i = 0; i < headers.length; i++) {
         if (scoreCodeHeader(headers[i]) >= 80) codeIndex = i;
@@ -370,6 +393,7 @@
 
       const headers = [...header.querySelectorAll('[role="columnheader"], [role="cell"], [role="gridcell"]')]
         .map(c => cleanText(c.innerText || c.textContent || ''));
+      if (!isCurrentSemesterRegistrationHeaders(headers)) continue;
 
       let nameIndex = -1, codeIndex = -1, classIndex = -1, best = -1;
       headers.forEach((h, i) => {
@@ -445,25 +469,30 @@
   }
 
   function scanPageForCourses() {
+    // Only accept authoritative current-semester registration tables/grids.
+    // Broad label fallbacks can accidentally pick up completed courses from
+    // pages such as "Chương trình khung".
     return dedupeScanned([
       ...extractFromHtmlTables(),
-      ...extractFromAriaGrids(),
-      ...extractFromKnownLabels()
+      ...extractFromAriaGrids()
     ]);
   }
 
   async function mergeScannedCourses(scanned) {
     if (!scanned.length) return { added: 0, total: (await loadCourses()).length };
 
+    // A successful scan comes only from the authoritative current-semester
+    // registration table/grid. Use that list as the source of truth so stale
+    // courses accidentally collected from other pages are removed.
     const current = (await loadCourses()).filter(isPracticeCourse);
-    const map = new Map();
+    const currentByKey = new Map();
     for (const item of current) {
       const key = courseKey(item);
-      const existing = map.get(key);
+      const existing = currentByKey.get(key);
       if (!existing) {
-        map.set(key, item);
+        currentByKey.set(key, item);
       } else {
-        map.set(key, {
+        currentByKey.set(key, {
           ...existing,
           ...item,
           id: existing.id || item.id,
@@ -480,13 +509,14 @@
         });
       }
     }
-    let added = 0;
 
+    let added = 0;
+    const merged = [];
     for (const incoming of scanned) {
       const key = courseKey(incoming);
-      const existing = map.get(key);
+      const existing = currentByKey.get(key);
       if (existing) {
-        map.set(key, {
+        merged.push({
           ...existing,
           name: incoming.name || existing.name,
           code: incoming.code || existing.code,
@@ -494,7 +524,7 @@
           detectedAt: new Date().toISOString()
         });
       } else {
-        map.set(key, {
+        merged.push({
           id: uid(),
           name: incoming.name,
           code: incoming.code || '',
@@ -512,7 +542,6 @@
       }
     }
 
-    const merged = [...map.values()];
     await saveCourses(merged);
     await chrome.storage.local.set({ [SCAN_HINT_KEY]: new Date().toISOString() });
     return { added, total: merged.length };
