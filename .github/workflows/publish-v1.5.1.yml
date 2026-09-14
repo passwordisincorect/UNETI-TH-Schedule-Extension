@@ -1,0 +1,43 @@
+name: Publish v1.5.1
+
+on:
+  push:
+    paths:
+      - '.github/workflows/publish-v1.5.1.yml'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Build v1.5.1 ZIP from the release commit
+        shell: bash
+        run: |
+          git archive             --format=zip             --prefix=UNETI_TH_Schedule_Extension_v1.5.1/             --output=UNETI_TH_Schedule_Extension_v1.5.1.zip             9659a093e88b6aeb80d0c5434a479d811544fe67
+
+      - name: Publish GitHub Release v1.5.1
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          if gh release view v1.5.1 >/dev/null 2>&1; then
+            echo "Release v1.5.1 already exists; leaving it unchanged."
+            exit 0
+          fi
+          gh release create v1.5.1             UNETI_TH_Schedule_Extension_v1.5.1.zip             --target 9659a093e88b6aeb80d0c5434a479d811544fe67             --title v1.5.1             --notes "Sửa vị trí ca Chiều/Tối; chỉ quét môn thực hành của học kỳ hiện tại; loại môn cũ từ Chương trình khung."
+
+      - name: Remove one-time release helper
+        shell: bash
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git rm -f .github/workflows/publish-v1.5.1.yml
+          git commit -m "Remove one-time v1.5.1 release helper"
+          git push origin HEAD:main
